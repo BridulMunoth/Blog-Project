@@ -63,7 +63,7 @@ export class StorageService {
     //     }
     // }
 
-    async createPost({ Title, slug, Content, Image, Status, UserID }) {
+    async createPost({ Title, slug, Content, Image, Status, UserID, AuthorName }) {
         try {
             return await this.databases.createDocument(
                 conf.appwriteDatabaseId,
@@ -75,6 +75,7 @@ export class StorageService {
                     Image,
                     Status,
                     UserID,
+                    AuthorName,
                 }
             )
         } catch (error) {
@@ -169,6 +170,10 @@ export class StorageService {
     }
 
     getFilePreview(fileId) {
+        if (!fileId) return "";
+        if (typeof fileId === 'string' && /^https?:\/\//i.test(fileId)) {
+            return fileId;
+        }
         return this.storage.getFileView(conf.appwriteBucketId, fileId);
     }
 

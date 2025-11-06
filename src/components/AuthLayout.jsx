@@ -21,6 +21,13 @@ useEffect(() => {
     }
 }, [authStatus, authentication, navigate])
 
-  return loading ? <h1>Loading...</h1>:<> {children} </>
+  return loading ? (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="text-center">
+        <div className="inline-block w-16 h-16 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin mb-4"></div>
+        <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">Loading...</p>
+      </div>
+    </div>
+  ) : <> {children} </>
 }
 

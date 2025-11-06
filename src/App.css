@@ -1,1 +1,8 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Optional: a few theme tokens to improve dark mode readability */
+@theme {
+  --color-background: var(--color-slate-950);
+  --color-foreground: var(--color-slate-100);
+}

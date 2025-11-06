@@ -5,11 +5,12 @@ import { useDispatch } from "react-redux";
 import authService from "./appwrite/auth";
 import { login, logout } from "./store/authSlice";
 import { Header, Footer } from "./components";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 function App() {
   const [loading, setLoading] = useState(true);
   const dispatch = useDispatch();
+  const location = useLocation();
 
   useEffect(() => {
     authService
@@ -29,18 +30,18 @@ function App() {
   }, [dispatch]);
 
   return !loading ? (
-    <div className='min-h-screen flex flex-wrap content-between bg-white'>
-      <div className='w-full block'>
-        <Header />
-        <main>
+    <div className='min-h-screen flex flex-col'>
+      <Header />
+      <main className="flex-1">
+        <div key={location.pathname} className="animate-fade-up">
           <Outlet />
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   ) : (
-    <div className="min-h-screen flex flex-wrap content-between bg-gray-400">
-      Loading...
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-slate-700 dark:text-slate-200 text-lg font-medium">Loading...</div>
     </div>
   );
 }

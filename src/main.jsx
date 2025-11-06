@@ -8,6 +8,7 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import { AuthLayout } from "./components/index.js";
 
 import { Home, Login, Signup, AllPosts, AddPost, EditPost , Post} from "./pages/index.js";
+import brmIcon from "./assets/BRM Blogger.png";
 
 const router = createBrowserRouter([
   {
@@ -68,6 +69,26 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
+// Set app title and favicon at runtime (works in dev and production)
+document.title = "BRM Blogger";
+const existingFavicon = document.querySelector('link[rel="icon"]');
+const faviconLink = existingFavicon || document.createElement('link');
+faviconLink.rel = 'icon';
+faviconLink.href = brmIcon;
+if (!existingFavicon) {
+  document.head.appendChild(faviconLink);
+}
+
+// Normalize theme to light on first load unless the app explicitly toggles it later
+try {
+  if (localStorage.getItem('theme') !== 'light') {
+    localStorage.setItem('theme', 'light');
+  }
+  document.documentElement.classList.remove('dark');
+} catch (_) {
+  document.documentElement.classList.remove('dark');
+}
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

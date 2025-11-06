@@ -12,6 +12,7 @@ import Select from "./Select";
 import RTE from "./RTE";
 import PostForm from "./post-form/PostForm";
 import AuthLayout from "./AuthLayout";
+import ThemeToggle from "./ThemeToggle";
 
 
-export { Header, Footer, Container, Logo, LogoutBtn, Login, Button, Input, PostCard, Select, RTE, PostForm, AuthLayout, Signup };
+export { Header, Footer, Container, Logo, LogoutBtn, Login, Button, Input, PostCard, Select, RTE, PostForm, AuthLayout, Signup, ThemeToggle };

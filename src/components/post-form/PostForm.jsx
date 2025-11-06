@@ -13,6 +13,8 @@ function PostForm({ post }) {
         Content: post?.Content || "",
         slug: post?.slug || "",
         Status: post?.Status || "active",
+        Category: post?.Category || "general",
+        ImageURL: typeof post?.Image === 'string' && /^https?:\/\//i.test(post?.Image) ? post.Image : "",
       },
     });
 
@@ -21,64 +23,70 @@ function PostForm({ post }) {
   const onSubmit = async (data) => {
     try {
       if (post) {
-        // Update post logic here
-        const file = data.Image?.[0]
-          ? await StorageService.uploadFile(data.Image[0])
-          : null;
+        // Update post logic
+        const hasFile = data.Image && data.Image[0];
+        const uploaded = hasFile ? await StorageService.uploadFile(data.Image[0]) : null;
 
-        let imageId = post.Image; // keep old image by default
-        if (file) {
-          StorageService.deleteFile(post.Image); // delete old one if new uploaded
-          imageId = file.$id;
+        let imageId = post.Image;
+        if (uploaded) {
+          if (post.Image) {
+            try { await StorageService.deleteFile(post.Image); } catch (_) {}
+          }
+          imageId = uploaded.$id;
+        } else if (data.ImageURL && /^https?:\/\//i.test(data.ImageURL)) {
+          imageId = data.ImageURL.trim();
         }
 
-        const dbPost = await StorageService.updatePost(post.$id, {
-          ...data,
-          Image: imageId, // always send a valid image id
-        });
-        if (dbPost) {
-          console.log("Post updated successfully:", dbPost);
-          navigate(`/posts/${dbPost.$id}`);
-        } else {
-          console.error("Failed to update post");
-        }
-      } else {
-        // Create new post logic here
-        // const file = data.Image[0]
-        //   ? await StorageService.uploadFile(data.Image[0])
-        //   : null;
+        const oldSlug = post.$id;
+        const newSlug = data.slug;
 
-        const file = await StorageService.uploadFile(data.Image[0]);
-
-        // if (file) {
-        //   const dbPost = await StorageService.upsertPost(data.slug, {
-        //     ...data,
-        //     Image: file ? file.$id : null,
-        //     UserID: user.$id,
-        //   });
-        //   if (dbPost) {
-        //     console.log("Post created successfully:", dbPost);
-        //     navigate(`/posts/${dbPost.$id}`);
-        //   } else {
-        //     console.error("Failed to create post");
-        //   }
-        // }
-
-        if (file) {
-          const fileId = file.$id;
-          console.log("File uploaded successfully:", fileId);
-          data.Image = fileId;
-          console.log("data with fileId:", data);
-          console.log("user:", user.$id);
-          const dbPost = await StorageService.createPost({
+        if (newSlug && newSlug !== oldSlug) {
+          const created = await StorageService.createPost({
             ...data,
-            UserID: user.$id, // Add UserID to the post data
+            slug: newSlug,
+            Image: imageId,
+            UserID: user.$id,
+            AuthorName: user.name || user.email || "Anonymous",
           });
-
+          if (created) {
+            try { await StorageService.deletePost(oldSlug); } catch (_) {}
+            navigate(`/post/${newSlug}`);
+            return;
+          }
+          console.error("Failed to recreate post with new slug");
+        } else {
+          const dbPost = await StorageService.updatePost(oldSlug, { ...data, Image: imageId });
           if (dbPost) {
-            navigate(`/post/${dbPost.$id}`);
+            navigate(`/post/${oldSlug}`);
+          } else {
+            console.error("Failed to update post");
           }
         }
+        return;
+      }
+
+      // Create new post
+      const hasFile = data.Image && data.Image[0];
+      const uploaded = hasFile ? await StorageService.uploadFile(data.Image[0]) : null;
+      let imageId = null;
+      if (uploaded) {
+        imageId = uploaded.$id;
+      } else if (data.ImageURL && /^https?:\/\//i.test(data.ImageURL)) {
+        imageId = data.ImageURL.trim();
+      } else {
+        alert("Please upload an image or paste a valid image URL");
+        return;
+      }
+
+      const dbPost = await StorageService.createPost({
+        ...data,
+        Image: imageId,
+        UserID: user.$id,
+        AuthorName: user.name || user.email || "Anonymous",
+      });
+      if (dbPost) {
+        const newSlug = dbPost.slug || data.slug;
+        navigate(`/post/${newSlug}`);
       }
     } catch (error) {
       console.error("Error submitting post:", error);
@@ -113,74 +121,98 @@ function PostForm({ post }) {
       setValue("slug", post.slug ? post.slug : slugTransform(post.Title), {
         shouldValidate: true,
       });
+      setValue("Category", post.Category || "general");
+      setValue("ImageURL", (typeof post.Image === 'string' && /^https?:\/\//i.test(post.Image)) ? post.Image : "");
     }
   }, [post, setValue, slugTransform]);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-wrap">
-      <div className="w-2/3 px-2">
-        <Input
-          label="Title :"
-          placeholder="Title"
-          className="mb-4"
-          {...register("Title", { required: true })}
-        />
-        <Input
-          label="Slug :"
-          placeholder="Slug"
-          className="mb-4"
-          {...register("slug", { required: true })}
-          onInput={(e) => {
-            setValue("slug", slugTransform(e.currentTarget.value), {
-              shouldValidate: true,
-            });
-          }}
-        />
-        <RTE
-          label="Content :"
-          name="Content"
-          control={control}
-          defaultValue={getValues("Content")}
-        />
-      </div>
-      <div className="w-1/3 px-2">
-        <Input
-          label={post ? "Change Image (optional):" : "Image :"}
-          type="file"
-          className="mb-4"
-          accept="image/png, image/jpg, image/jpeg, image/gif"
-          {...register("Image", { required: !post })}
-        />
-
-        {post && post.Image && (
-          <div className="w-full mb-4">
-            <p className="text-sm text-gray-600 mb-1">Current Image:</p>
-            {/* Debug: Show the generated URL */}
-            <p className="text-xs text-red-500 break-all">
-              {StorageService.getFilePreview(post.Image)}
-            </p>
-            <img
-              src={StorageService.getFilePreview(post.Image)}
-              alt={post.Title}
-              className="rounded-lg"
+    <div className="w-full py-8">
+      <div className="relative mx-auto w-full max-w-6xl rounded-2xl p-6 sm:p-8 shadow-2xl ring-1 ring-slate-900/10 backdrop-blur bg-white dark:bg-slate-800/90 dark:ring-slate-700 overflow-hidden">
+        <div className="absolute inset-x-0 -top-1 mx-auto h-1.5 w-40 rounded-full bg-gradient-to-r from-orange-500 via-purple-500 to-cyan-500 shadow-lg shadow-orange-500/50"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/3 via-purple-500/3 to-cyan-500/3 pointer-events-none"></div>
+        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Input
+              label="Title :"
+              placeholder="Title"
+              className=""
+              {...register("Title", { required: true })}
             />
+            <Input
+              label="Slug :"
+              placeholder="Slug"
+              className=""
+              {...register("slug", { required: true })}
+              onInput={(e) => {
+                setValue("slug", slugTransform(e.currentTarget.value), {
+                  shouldValidate: true,
+                });
+              }}
+            />
+            <div className="rounded-xl ring-1 ring-slate-900/10 dark:ring-slate-700 bg-white dark:bg-slate-800/60 p-2">
+              <RTE
+                label="Content :"
+                name="Content"
+                control={control}
+                defaultValue={getValues("Content")}
+              />
+            </div>
           </div>
-        )}
-        <Select
-          options={["active", "inactive"]}
-          label="Status"
-          className="mb-4"
-          {...register("Status", { required: true })}
-        />
-        <Button
-          type="submit"
-          bgColor={post ? "bg-green-500" : undefined}
-          className="w-full"
-        >
-          {post ? "Update" : "Submit"}
-        </Button>
+          <div className="space-y-4">
+            <Input
+              label={post ? "Change Image (optional):" : "Image :"}
+              type="file"
+              className=""
+              accept="image/png, image/jpg, image/jpeg, image/gif"
+              {...register("Image", { required: !post })}
+            />
+            <Input
+              label="Or paste Image URL"
+              type="url"
+              placeholder="https://..."
+              {...register("ImageURL")}
+            />
+
+            {post && post.Image && (
+              <div className="w-full">
+                <p className="text-sm text-gray-600 dark:text-slate-300 mb-1">Current Image:</p>
+                {/* Debug: Show the generated URL */}
+                <p className="text-xs text-red-500 break-all">
+                  {StorageService.getFilePreview(post.Image)}
+                </p>
+                <div className="overflow-hidden rounded-lg ring-1 ring-slate-900/10 dark:ring-slate-700">
+                  <img
+                    src={StorageService.getFilePreview(post.Image)}
+                    alt={post.Title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+            <Select
+              options={["active", "inactive"]}
+              label="Status"
+              className=""
+              {...register("Status", { required: true })}
+            />
+            <Select
+              options={["general","technology","health","travel","food","finance","sports","education","lifestyle","entertainment"]}
+              label="Category"
+              className=""
+              {...register("Category", { required: true })}
+            />
+            <Button
+              type="submit"
+              bgColor={post ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}
+              className="w-full"
+            >
+              {post ? "Update" : "Submit"}
+            </Button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 }
 
